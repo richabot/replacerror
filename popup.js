@@ -1,19 +1,3 @@
-chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-    chrome.scripting.executeScript({
-        target: {tabId: tabs[0].id},
-        function: () => {
-            document.addEventListener("keyup", function(event) {
-                const target = event.target;
-                if (target.matches("input[type='text'], input[type='search'], textarea")) {
-                    const text = target.value;
-                    chrome.runtime.sendMessage({ type: 'text', text: text });
-                }
-            });
-        }
-    });
-});
-
-// Listen for messages from background page
 chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'suggestions') {
         const suggestions = message.suggestions;
@@ -26,14 +10,13 @@ chrome.runtime.onMessage.addListener((message) => {
             const suggestionElement = document.createElement("div");
             suggestionElement.innerHTML = `Did you mean <span class="suggestion">${suggestion.suggestion}</span> instead of <span class="error">${suggestion.error}</span>?`;
             suggestionElement.onclick = function() {
-                replaceWord(target, suggestion.error, suggestion.suggestion);
+                // Send message to content script to replace error with suggestion
+                chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+                    chrome.tabs.sendMessage(tabs[0].id, { type: 'replace', error: suggestion.error, suggestion: suggestion.suggestion });
+                });
+                suggestionsDiv.innerHTML = "";
             }
             suggestionsDiv.appendChild(suggestionElement);
         }
     }
 });
-
-function replaceWord(target, error, suggestion) {
-    const regex = new RegExp(error, "g");
-    target.value = target.value.replace(regex, suggestion);
-}
